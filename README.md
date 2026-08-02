@@ -84,17 +84,4 @@ To run with containerized PostgreSQL database:
 docker-compose up --build -d
 ```
 
----
-
-## 🔒 Environment Variables (`.env`)
-
-```env
-DATABASE_URL="file:./dev.db"
-NEXTAUTH_SECRET="super-secret-gym-crm-saas-token-key-2026"
-NEXTAUTH_URL="http://localhost:3000"
-GEMINI_API_KEY="" # Optional: system provides intelligent fallback if empty
-```
-
----
-
 Built for commercial fitness clubs and SaaS gym management.
