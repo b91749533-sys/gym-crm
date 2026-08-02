@@ -1,0 +1,188 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String       @id @default(uuid())
+  email         String       @unique
+  passwordHash  String
+  name          String
+  avatar        String?
+  role          String       @default("MEMBER") // ADMIN, MANAGER, TRAINER, RECEPTIONIST, MEMBER
+  status        String       @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED
+  phone         String?
+  bio           String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  memberProfile       MemberProfile?
+  assignedWorkouts    WorkoutPlan[]    @relation("AssignedWorkouts")
+  createdWorkouts     WorkoutPlan[]    @relation("CreatedWorkouts")
+  assignedNutrition   NutritionPlan[]  @relation("AssignedNutrition")
+  createdNutrition    NutritionPlan[]  @relation("CreatedNutrition")
+  attendances         Attendance[]     @relation("MemberAttendance")
+  payments            Payment[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+}
+
+model MemberProfile {
+  id                    String     @id @default(uuid())
+  userId                String     @unique
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gender                String?
+  dob                   DateTime?
+  heightCm              Float?
+  weightKg              Float?
+  targetWeightKg        Float?
+  fitnessGoal           String?
+  medicalNotes          String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  qrCode                String     @unique
+  joinDate              DateTime   @default(now())
+
+  memberships           MemberMembership[]
+}
+
+model MembershipPlan {
+  id             String             @id @default(uuid())
+  name           String
+  description    String?
+  durationMonths Int
+  price          Float
+  type           String             @default("MONTHLY") // MONTHLY, QUARTERLY, SEMIANNUAL, ANNUAL, STUDENT, VIP, PERSONAL_TRAINING
+  features       String             // Store comma-separated list of features
+  isPopular      Boolean            @default(false)
+  isActive       Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+
+  memberMemberships MemberMembership[]
+}
+
+model MemberMembership {
+  id             String           @id @default(uuid())
+  memberId       String
+  member         MemberProfile    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  planId         String
+  plan           MembershipPlan   @relation(fields: [planId], references: [id])
+  startDate      DateTime         @default(now())
+  endDate        DateTime
+  status         String           @default("ACTIVE") // ACTIVE, FROZEN, CANCELLED, EXPIRED
+  autoRenew      Boolean          @default(true)
+  pricePaid      Float
+  createdAt      DateTime         @default(now())
+
+  payments       Payment[]
+}
+
+model Attendance {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User          @relation("MemberAttendance", fields: [userId], references: [id], onDelete: Cascade)
+  checkInTime   DateTime      @default(now())
+  checkOutTime  DateTime?
+  method        String        @default("QR_CODE") // QR_CODE, BARCODE, MANUAL, RECEPTIONIST
+  verifiedBy    String?
+}
+
+model Exercise {
+  id           String   @id @default(uuid())
+  name         String
+  category     String   // Strength, Cardio, Flexibility, etc.
+  muscleGroup  String   // Chest, Back, Legs, Core, Arms, Shoulders
+  equipment    String?
+  videoUrl     String?
+  imageUrl     String?
+  instructions String?
+  createdAt    DateTime @default(now())
+}
+
+model WorkoutPlan {
+  id            String   @id @default(uuid())
+  title         String
+  description   String?
+  level         String   @default("INTERMEDIATE")
+  goal          String?
+  isTemplate    Boolean  @default(false)
+  createdById   String
+  createdBy     User     @relation("CreatedWorkouts", fields: [createdById], references: [id])
+  assignedToId  String?
+  assignedTo    User?    @relation("AssignedWorkouts", fields: [assignedToId], references: [id])
+  exercisesJson String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model NutritionPlan {
+  id            String   @id @default(uuid())
+  title         String
+  assignedToId  String?
+  assignedTo    User?    @relation("AssignedNutrition", fields: [assignedToId], references: [id])
+  createdById   String
+  createdBy     User     @relation("CreatedNutrition", fields: [createdById], references: [id])
+  dailyCalories Int
+  proteinGrams  Int
+  carbsGrams    Int
+  fatGrams      Int
+  mealsJson     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Payment {
+  id            String            @id @default(uuid())
+  userId        String
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membershipId  String?
+  membership    MemberMembership? @relation(fields: [membershipId], references: [id])
+  amount        Float
+  paymentMethod String            @default("CARD") // CASH, CARD, RECURRING, ONLINE
+  status        String            @default("COMPLETED") // COMPLETED, PENDING, REFUNDED, FAILED
+  invoiceNumber String            @unique
+  description   String?
+  date          DateTime          @default(now())
+}
+
+model Product {
+  id            String   @id @default(uuid())
+  name          String
+  category      String   @default("SUPPLEMENT") // SUPPLEMENT, DRINK, MERCHANDISE, EQUIPMENT
+  sku           String   @unique
+  price         Float
+  costPrice     Float
+  stockQuantity Int      @default(0)
+  minStockLevel Int      @default(5)
+  supplier      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("SYSTEM")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userEmail String
+  userRole  String
+  action    String
+  entity    String
+  details   String
+  ipAddress String?  @default("127.0.0.1")
+  createdAt DateTime @default(now())
+}

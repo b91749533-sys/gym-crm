@@ -1,0 +1,223 @@
+'use client';
+
+import React, { useState } from 'react';
+import { Dumbbell, Sparkles, Plus, Trash2, Save, Play, Search, Flame, CheckCircle2 } from 'lucide-react';
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { Badge } from '../ui/Badge';
+import { ExerciseItem, WorkoutPlan } from '@/lib/types';
+import { MOCK_WORKOUTS } from '@/lib/mock-data';
+import { generateAIWorkoutPlan } from '@/lib/gemini';
+
+export const WorkoutBuilderModule: React.FC = () => {
+  const [workouts, setWorkouts] = useState<WorkoutPlan[]>(MOCK_WORKOUTS);
+  const [activePlan, setActivePlan] = useState<WorkoutPlan>(MOCK_WORKOUTS[0]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('Create a 4-day muscle hypertrophy workout routine focusing on chest and back');
+  const [aiLevel, setAiLevel] = useState('INTERMEDIATE');
+
+  // Exercise Form State
+  const [newExName, setNewExName] = useState('');
+  const [newExMuscle, setNewExMuscle] = useState('Chest');
+  const [newExSets, setNewExSets] = useState('4');
+  const [newExReps, setNewExReps] = useState('8-12');
+  const [newExRest, setNewExRest] = useState('60');
+
+  const handleAddExercise = () => {
+    if (!newExName) return;
+    const newEx: ExerciseItem = {
+      id: `ex-${Date.now()}`,
+      name: newExName,
+      category: 'Hypertrophy',
+      muscleGroup: newExMuscle,
+      equipment: 'Free Weights',
+      sets: parseInt(newExSets, 10) || 4,
+      reps: newExReps || '10',
+      restSeconds: parseInt(newExRest, 10) || 60,
+    };
+
+    setActivePlan({
+      ...activePlan,
+      exercises: [...activePlan.exercises, newEx],
+    });
+
+    setNewExName('');
+  };
+
+  const handleDeleteExercise = (id: string) => {
+    setActivePlan({
+      ...activePlan,
+      exercises: activePlan.exercises.filter((ex) => ex.id !== id),
+    });
+  };
+
+  const handleGenerateAiWorkout = async () => {
+    setIsAiLoading(true);
+    try {
+      const generated = await generateAIWorkoutPlan(aiPrompt, aiLevel, 'Muscle Growth & Hypertrophy');
+      const newPlan: WorkoutPlan = {
+        id: `wp-${Date.now()}`,
+        title: generated.title || 'AI Hypertrophy Split',
+        description: generated.description || 'AI Generated plan',
+        level: aiLevel as any,
+        goal: 'Hypertrophy',
+        isTemplate: true,
+        createdBy: 'APEX Gemini AI',
+        exercises: generated.exercises || [],
+        createdAt: new Date().toISOString().slice(0, 10),
+      };
+      setWorkouts([newPlan, ...workouts]);
+      setActivePlan(newPlan);
+    } catch (e) {
+      console.error('AI Workout error:', e);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 pb-12">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-extrabold text-white tracking-tight">Interactive Workout Builder & AI Generator</h2>
+          <p className="text-xs text-zinc-400 mt-1">Design set/rep schemes, manage exercise templates, or let Gemini AI build custom splits.</p>
+        </div>
+      </div>
+
+      {/* Gemini AI Generator Banner */}
+      <Card glow className="bg-gradient-to-r from-zinc-900 via-zinc-900 to-cyan-950/40 border-cyan-500/40 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-5 h-5 text-cyan-400" />
+          <h3 className="text-sm font-bold text-white">Gemini AI Workout Generator</h3>
+          <Badge variant="cyan">INSTANT AI</Badge>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="md:col-span-2">
+            <Input
+              placeholder="Describe fitness goal, focus area, equipment..."
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              className="text-xs"
+            />
+          </div>
+          <div>
+            <select
+              value={aiLevel}
+              onChange={(e) => setAiLevel(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-zinc-100 focus:outline-none focus:border-cyan-500 h-9"
+            >
+              <option value="BEGINNER">BEGINNER</option>
+              <option value="INTERMEDIATE">INTERMEDIATE</option>
+              <option value="ADVANCED">ADVANCED</option>
+            </select>
+          </div>
+          <Button
+            variant="glow"
+            size="sm"
+            disabled={isAiLoading}
+            onClick={handleGenerateAiWorkout}
+            icon={<Sparkles className="w-4 h-4" />}
+          >
+            {isAiLoading ? 'AI Generating...' : 'Generate Split'}
+          </Button>
+        </div>
+      </Card>
+
+      {/* Main Workspace Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Workout Plan Selector Sidebar */}
+        <Card className="space-y-3">
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Workout Library ({workouts.length})</h3>
+          <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+            {workouts.map((w) => (
+              <button
+                key={w.id}
+                onClick={() => setActivePlan(w)}
+                className={`w-full text-left p-3 rounded-xl border text-xs transition-all ${
+                  activePlan.id === w.id
+                    ? 'bg-zinc-800 border-cyan-500/50 text-white shadow-md'
+                    : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="font-bold text-white">{w.title}</p>
+                  <Badge variant="purple">{w.level}</Badge>
+                </div>
+                <p className="text-[11px] text-zinc-400 mt-1 line-clamp-1">{w.description}</p>
+                <p className="text-[10px] text-cyan-400 font-semibold mt-2">{w.exercises.length} Exercises Listed</p>
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        {/* Active Workout Editor Workspace */}
+        <Card className="lg:col-span-2 space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-extrabold text-white">{activePlan.title}</h3>
+                <Badge variant="cyan">{activePlan.level}</Badge>
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5">{activePlan.description}</p>
+            </div>
+            <Button variant="outline" size="sm" icon={<Save className="w-3.5 h-3.5" />}>
+              Save Plan
+            </Button>
+          </div>
+
+          {/* Exercises Table */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Plan Exercises ({activePlan.exercises.length})</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-zinc-800 text-zinc-500 uppercase tracking-wider font-semibold">
+                    <th className="pb-2 px-2">Exercise</th>
+                    <th className="pb-2 px-2">Muscle Group</th>
+                    <th className="pb-2 px-2">Sets</th>
+                    <th className="pb-2 px-2">Reps</th>
+                    <th className="pb-2 px-2">Rest</th>
+                    <th className="pb-2 px-2 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-800/60">
+                  {activePlan.exercises.map((ex) => (
+                    <tr key={ex.id} className="hover:bg-zinc-800/40 transition-colors">
+                      <td className="py-2.5 px-2 font-bold text-white">{ex.name}</td>
+                      <td className="py-2.5 px-2"><Badge variant="purple">{ex.muscleGroup}</Badge></td>
+                      <td className="py-2.5 px-2 font-mono text-zinc-300">{ex.sets}</td>
+                      <td className="py-2.5 px-2 font-mono text-zinc-300">{ex.reps}</td>
+                      <td className="py-2.5 px-2 text-zinc-400">{ex.restSeconds}s</td>
+                      <td className="py-2.5 px-2 text-right">
+                        <button
+                          onClick={() => handleDeleteExercise(ex.id)}
+                          className="p-1 text-zinc-500 hover:text-rose-400 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Add Exercise Row Form */}
+          <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800/80 space-y-3">
+            <span className="text-xs font-bold text-white uppercase tracking-wider block">+ Add Exercise to Plan</span>
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+              <Input placeholder="Exercise name..." value={newExName} onChange={(e) => setNewExName(e.target.value)} className="sm:col-span-2 text-xs" />
+              <Input placeholder="Muscle group..." value={newExMuscle} onChange={(e) => setNewExMuscle(e.target.value)} className="text-xs" />
+              <Input placeholder="Sets (e.g. 4)" value={newExSets} onChange={(e) => setNewExSets(e.target.value)} className="text-xs" />
+              <Button variant="secondary" size="sm" onClick={handleAddExercise}>Add</Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
